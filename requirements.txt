@@ -1,0 +1,30 @@
+# Shopify-Xero Sync System Dependencies
+# All versions pinned for reproducibility
+
+# HTTP client with async support (for Shopify)
+httpx==0.28.1
+
+# Async web server for OAuth callback
+aiohttp==3.11.11
+
+# Xero Official SDK
+xero-python==9.3.0
+
+# Data validation
+pydantic==2.12.5
+pydantic-settings==2.12.0
+
+# Testing
+pytest==9.0.2
+pytest-asyncio==1.3.0
+pytest-httpx==0.36.0
+pytest-cov==7.0.0
+
+# Logging
+python-json-logger==4.0.0
+
+# Environment management
+python-dotenv==1.2.1
+
+# Type checking (dev)
+mypy==1.19.1

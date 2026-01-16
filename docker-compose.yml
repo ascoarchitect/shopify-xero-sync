@@ -1,0 +1,50 @@
+# Shopify-Xero Sync System
+# Docker Compose configuration for local development and execution
+# Note: 'version' key is deprecated in Docker Compose V2 and omitted intentionally
+
+services:
+  shopify-xero-sync:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shopify-xero-sync
+
+    # Environment variables from .env file
+    env_file:
+      - .env
+
+    # Volume mounts for persistent data
+    volumes:
+      # SQLite database - persisted outside container
+      - ./data:/app/data
+      # Logs - persisted for debugging
+      - ./logs:/app/logs
+      # Mount .env file for runtime config
+      - ./.env:/app/.env:ro
+
+    # Override environment variables if needed
+    environment:
+      - DATABASE_PATH=/app/data/sync.db
+      - LOG_FILE=/app/logs/sync.log
+
+    # Resource limits for local execution
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+    # Restart policy - don't restart on failure for manual runs
+    restart: "no"
+
+    # Network isolation - only outbound needed for API calls
+    networks:
+      - sync-network
+
+# Network definition
+networks:
+  sync-network:
+    driver: bridge
