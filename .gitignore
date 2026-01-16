@@ -85,6 +85,10 @@ coverage.xml
 .settings/
 *.sublime-workspace
 *.sublime-project
+.claude/
+CLAUDE.md
+.kiro/
+.trunk/
 
 # =============================================================================
 # DOCKER
