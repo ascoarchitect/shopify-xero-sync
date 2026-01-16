@@ -1,6 +1,6 @@
 # Shopify-Xero Sync System
 
-A local Docker-based synchronization system that syncs customers, products, and orders from Shopify to Xero accounting software. Built for small businesses with <50 products and <10 orders/day.
+A local Docker-based synchronization system that syncs customers, products, and orders from Shopify to Xero accounting software. Built for small businesses with <500 products and <50 orders/day.
 
 ## Features
 
