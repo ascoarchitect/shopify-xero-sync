@@ -189,7 +189,7 @@ docker-compose run --rm shopify-xero-sync
 
 ## Xero OAuth2 Setup
 
-1. Create app at [Xero Developer Portal](https://developer.xero.com/)
+1. Create app at [Xero Developer Portal](https://developer.xero.com/) or within your organisation
 2. Set redirect URI to `http://localhost:8080/callback`
 3. Get Client ID and Client Secret from app overview
 4. Run `python auth_xero.py` to complete OAuth flow
@@ -197,14 +197,12 @@ docker-compose run --rm shopify-xero-sync
 
 ## Shopify OAuth2 Setup
 
-1. Create Partner account at [Shopify Partners](https://partners.shopify.com/)
+1. Create Partner account at [Shopify Partners](https://partners.shopify.com/) or within your tenant [Shopify Dev](https://dev.shopify.com/)
 2. Create app in Dev Dashboard
 3. Configure redirect URI: `http://localhost:8080/callback`
 4. Get Client ID and Client Secret from app overview
 5. Run `python auth_shopify.py` to complete OAuth flow
 6. Access token doesn't expire (offline token)
-
-See [SHOPIFY_OAUTH_MIGRATION.md](SHOPIFY_OAUTH_MIGRATION.md) for detailed migration guide from legacy custom apps.
 
 ## Troubleshooting
 
