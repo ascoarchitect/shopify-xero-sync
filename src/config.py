@@ -72,6 +72,10 @@ class Settings(BaseSettings):
         default=False,
         description="If true, don't actually update Xero"
     )
+    enable_email_marketing: bool = Field(
+        default=False,
+        description="If true, set all customers to accept email marketing in Shopify"
+    )
     database_path: Path = Field(
         default=Path("data/sync.db"),
         description="SQLite database file path"

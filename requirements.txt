@@ -5,7 +5,7 @@
 httpx==0.28.1
 
 # Async web server for OAuth callback
-aiohttp==3.11.11
+aiohttp==3.13.3
 
 # Xero Official SDK
 xero-python==9.3.0

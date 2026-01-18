@@ -284,6 +284,14 @@ class SyncEngine:
         shopify_id = str(customer.id)
         new_checksum = calculate_customer_checksum(customer)
 
+        # Update email marketing consent if enabled
+        if self.settings.enable_email_marketing:
+            try:
+                await self._update_customer_email_marketing(customer.id)
+            except Exception as e:
+                logger.warning(f"Failed to update email marketing for customer {shopify_id}: {e}")
+                # Don't fail the sync if email marketing update fails
+
         # Check existing mapping
         mapping = self.db.get_mapping(shopify_id)
 
@@ -922,6 +930,141 @@ class SyncEngine:
     # =========================================================================
     # RETRY & UTILITIES
     # =========================================================================
+
+    async def _update_customer_email_marketing(self, customer_id: int) -> None:
+        """Update a customer's email marketing consent in Shopify.
+
+        Args:
+            customer_id: Shopify customer ID
+
+        Raises:
+            ShopifyAPIError: On API errors
+        """
+        if self.dry_run:
+            logger.debug(f"[DRY RUN] Would enable email marketing for customer {customer_id}")
+            return
+
+        await self.shopify.update_customer_email_marketing(customer_id, accepts_marketing=True)
+
+    async def enable_email_marketing_for_all_customers(self) -> SyncResult:
+        """Enable email marketing for all customers in Shopify.
+
+        This is useful for migrating from another platform where email
+        marketing consent wasn't properly transferred.
+
+        Uses efficient batch processing to minimize API calls and avoid rate limits.
+        Only updates customers who are NOT already subscribed.
+
+        Returns:
+            SyncResult with counts of updated/skipped/errors
+        """
+        result = SyncResult(success=True)
+
+        logger.info("=" * 50)
+        logger.info("ENABLING EMAIL MARKETING FOR ALL CUSTOMERS")
+        logger.info("=" * 50)
+
+        if self.dry_run:
+            logger.info("DRY RUN MODE - No changes will be made to Shopify")
+
+        try:
+            # Fetch all customers
+            logger.info("Fetching all customers from Shopify...")
+            customers = await self._fetch_entities(self.shopify.fetch_all_customers)
+
+            logger.info(f"Found {len(customers)} total customers")
+
+            # Filter to only customers who are NOT subscribed
+            customers_to_update = [
+                customer for customer in customers
+                if not customer.is_subscribed_to_email_marketing
+            ]
+
+            result.skipped = len(customers) - len(customers_to_update)
+
+            logger.info(
+                f"Found {len(customers_to_update)} customers to update "
+                f"({result.skipped} already subscribed)"
+            )
+
+            if not customers_to_update:
+                logger.info("All customers are already subscribed!")
+                return result
+
+            if self.dry_run:
+                # In dry run, just show what would be updated
+                for customer in customers_to_update:
+                    logger.info(
+                        f"[DRY RUN] Would enable email marketing for customer {customer.id} "
+                        f"({customer.email or 'no email'})"
+                    )
+                    result.updated += 1
+                    await asyncio.sleep(0.01)  # Small delay for readability
+            else:
+                # Use batch operations for efficiency
+                from .shopify_graphql_client import ShopifyGraphQLClient
+                from .shopify_bulk_operations import ShopifyBulkOperations
+
+                # Check if we're using GraphQL client
+                if isinstance(self.shopify, ShopifyGraphQLClient):
+                    logger.info("Using batch operations for efficient updates...")
+
+                    # Extract customer IDs
+                    customer_ids = [customer.id for customer in customers_to_update]
+
+                    # Use bulk operations handler
+                    bulk_ops = ShopifyBulkOperations(self.shopify)
+                    batch_result = await bulk_ops.batch_update_customer_email_marketing(
+                        customer_ids=customer_ids,
+                        accepts_marketing=True,
+                        batch_size=50  # Process 50 at a time
+                    )
+
+                    result.updated = batch_result['updated']
+                    result.errors = batch_result['errors']
+                    result.success = batch_result['success']
+
+                    logger.info(
+                        f"Batch update completed in {batch_result['duration']:.1f}s: "
+                        f"{batch_result['updated']} updated, {batch_result['failed']} failed"
+                    )
+                else:
+                    # Fallback to individual updates for REST API
+                    logger.info("Using individual updates (REST API)...")
+                    for customer in customers_to_update:
+                        try:
+                            await self.shopify.update_customer_email_marketing(
+                                customer.id,
+                                accepts_marketing=True
+                            )
+                            logger.info(
+                                f"Enabled email marketing for customer {customer.id} "
+                                f"({customer.email or 'no email'})"
+                            )
+                            result.updated += 1
+
+                            # Add small delay to respect rate limits
+                            await asyncio.sleep(0.5)
+
+                        except Exception as e:
+                            error_msg = f"Customer {customer.id}: {str(e)}"
+                            logger.error(error_msg)
+                            result.errors.append(error_msg)
+
+        except Exception as e:
+            logger.error(f"Failed to fetch customers: {e}")
+            result.errors.append(f"Fetch failed: {str(e)}")
+            result.success = False
+
+        logger.info("=" * 50)
+        logger.info(
+            f"Email marketing update complete: "
+            f"{result.updated} updated, {result.skipped} already subscribed, "
+            f"{len(result.errors)} errors"
+        )
+        logger.info("=" * 50)
+
+        return result
 
     async def retry_failed_syncs(self) -> SyncResult:
         """Retry previously failed sync operations.

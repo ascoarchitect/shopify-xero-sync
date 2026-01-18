@@ -169,6 +169,11 @@ class ShopifyGraphQLClient:
                     tags
                     taxExempt
                     verifiedEmail
+                    emailMarketingConsent {
+                      marketingState
+                      marketingOptInLevel
+                      consentUpdatedAt
+                    }
                     defaultAddress {
                       id
                       address1
@@ -255,6 +260,16 @@ class ShopifyGraphQLClient:
         if isinstance(tags, list):
             tags = ", ".join(tags) if tags else None
 
+        # Parse email marketing consent
+        email_marketing_consent = node.get("emailMarketingConsent")
+        if email_marketing_consent:
+            # Convert GraphQL format to dict
+            email_marketing_consent = {
+                'marketingState': email_marketing_consent.get('marketingState'),
+                'marketingOptInLevel': email_marketing_consent.get('marketingOptInLevel'),
+                'consentUpdatedAt': email_marketing_consent.get('consentUpdatedAt'),
+            }
+
         return ShopifyCustomer(
             id=customer_id,
             email=node.get("email"),
@@ -269,6 +284,7 @@ class ShopifyGraphQLClient:
             tags=tags,
             tax_exempt=node.get("taxExempt", False),
             verified_email=node.get("verifiedEmail", False),
+            email_marketing_consent=email_marketing_consent,
         )
 
     def _parse_address(self, addr: Dict[str, Any]) -> ShopifyAddress:
@@ -699,6 +715,73 @@ class ShopifyGraphQLClient:
     # =========================================================================
     # CONNECTION TEST
     # =========================================================================
+
+    async def update_customer_email_marketing(
+        self,
+        customer_id: int,
+        accepts_marketing: bool = True,
+    ) -> bool:
+        """Update customer's email marketing consent using GraphQL mutation.
+
+        Args:
+            customer_id: Shopify customer ID (numeric)
+            accepts_marketing: Whether customer accepts marketing emails
+
+        Returns:
+            True if successful
+
+        Raises:
+            ShopifyGraphQLError: On API errors
+        """
+        # Use the dedicated customerEmailMarketingConsentUpdate mutation
+        mutation = """
+        mutation customerEmailMarketingConsentUpdate($input: CustomerEmailMarketingConsentUpdateInput!) {
+          customerEmailMarketingConsentUpdate(input: $input) {
+            customer {
+              id
+              email
+              emailMarketingConsent {
+                marketingState
+                marketingOptInLevel
+              }
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+        """
+
+        # Convert numeric ID to GraphQL global ID
+        gid = f"gid://shopify/Customer/{customer_id}"
+
+        variables = {
+            "input": {
+                "customerId": gid,
+                "emailMarketingConsent": {
+                    "marketingState": "SUBSCRIBED" if accepts_marketing else "UNSUBSCRIBED",
+                    "marketingOptInLevel": "SINGLE_OPT_IN",
+                }
+            }
+        }
+
+        try:
+            data = await self._query(mutation, variables)
+            result = data.get("customerEmailMarketingConsentUpdate", {})
+
+            # Check for user errors
+            user_errors = result.get("userErrors", [])
+            if user_errors:
+                error_messages = [f"{e.get('field')}: {e.get('message')}" for e in user_errors]
+                raise ShopifyGraphQLError(f"Customer update errors: {', '.join(error_messages)}")
+
+            logger.debug(f"Updated email marketing for customer {customer_id}: {accepts_marketing}")
+            return True
+
+        except ShopifyGraphQLError as e:
+            logger.error(f"Failed to update email marketing for customer {customer_id}: {e}")
+            raise
 
     async def check_connection(self) -> bool:
         """Verify API connection is working.

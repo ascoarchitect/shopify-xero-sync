@@ -91,6 +91,7 @@ class ShopifyCustomer(BaseModel):
     tags: Optional[str] = None
     tax_exempt: bool = False
     verified_email: bool = False
+    email_marketing_consent: Optional[dict] = None  # Contains marketingState, marketingOptInLevel, consentUpdatedAt
 
     @field_validator('created_at', 'updated_at', mode='before')
     @classmethod
@@ -103,6 +104,14 @@ class ShopifyCustomer(BaseModel):
         """Get customer's full name."""
         parts = [self.first_name, self.last_name]
         return " ".join(p for p in parts if p) or "Unknown"
+
+    @property
+    def is_subscribed_to_email_marketing(self) -> bool:
+        """Check if customer is subscribed to email marketing."""
+        if not self.email_marketing_consent:
+            return False
+        marketing_state = self.email_marketing_consent.get('marketingState', 'NOT_SUBSCRIBED')
+        return marketing_state == 'SUBSCRIBED'
 
 
 class ShopifyProductVariant(BaseModel):

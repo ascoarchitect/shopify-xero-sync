@@ -5,6 +5,7 @@ A local Docker-based synchronization system that syncs customers, products, and 
 ## Features
 
 - **Customer Sync**: Syncs Shopify customers to Xero contacts
+- **Email Marketing Management**: Option to enable email marketing for all customers
 - **Change Detection**: Uses checksums to detect actual changes before syncing
 - **Duplicate Prevention**: Checks by email before creating new contacts
 - **Rate Limiting**: Respects both Shopify (2/sec) and Xero (60/min) rate limits
@@ -69,7 +70,11 @@ A local Docker-based synchronization system that syncs customers, products, and 
    - Configuration tab:
      - App URL: `http://localhost:8080`
      - Allowed redirection URL(s): `http://localhost:8080/callback`
-   - Access scopes: `read_customers`, `read_products`, `read_orders`
+   - Access scopes:
+     - `read_customers` - Required for syncing customers
+     - `write_customers` - Required for email marketing feature
+     - `read_products` - Required for syncing products
+     - `read_orders` - Required for syncing orders
    - Save
 
 4. **Get credentials**:
@@ -118,6 +123,24 @@ DRY_RUN=false
 docker-compose run --rm shopify-xero-sync
 ```
 
+### Enable Email Marketing for All Customers
+This is useful if you migrated from another platform (like Wix) and email marketing consent wasn't transferred:
+
+**Important:** This feature requires the `write_customers` Shopify API scope. If you get a 403 error, see `SHOPIFY_PERMISSIONS_UPDATE.md` for instructions on updating your app permissions.
+
+```bash
+# Dry run first to see what would be updated
+docker-compose run --rm shopify-xero-sync python enable_email_marketing.py --dry-run
+
+# Actually enable email marketing for all customers
+docker-compose run --rm shopify-xero-sync python enable_email_marketing.py
+```
+
+Alternatively, you can enable this automatically during regular syncs by setting in `.env`:
+```bash
+ENABLE_EMAIL_MARKETING=true
+```
+
 ### Dry Run (no changes made)
 ```bash
 docker-compose run --rm shopify-xero-sync python sync.py --dry-run
@@ -148,7 +171,8 @@ shopify-xero-sync/
 │   ├── database.py         # SQLite operations
 │   ├── models.py           # Pydantic data models
 │   ├── checksums.py        # Change detection
-│   ├── shopify_client.py   # Shopify API client
+│   ├── shopify_client.py   # Shopify REST API client
+│   ├── shopify_graphql_client.py  # Shopify GraphQL API client
 │   ├── shopify_oauth.py    # Shopify OAuth2 flow handler
 │   ├── xero_client.py      # Xero API client
 │   └── sync_engine.py      # Core sync logic
@@ -158,6 +182,7 @@ shopify-xero-sync/
 ├── sync.py                 # Main entry point
 ├── auth_shopify.py         # Shopify OAuth helper
 ├── auth_xero.py            # Xero OAuth helper
+├── enable_email_marketing.py  # Enable email marketing for all customers
 ├── Dockerfile              # Container definition
 ├── docker-compose.yml      # Container orchestration
 ├── requirements.txt        # Python dependencies

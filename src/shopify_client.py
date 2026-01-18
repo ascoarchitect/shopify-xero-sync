@@ -264,6 +264,46 @@ class ShopifyClient:
                 return None
             raise
 
+    async def update_customer_email_marketing(
+        self,
+        customer_id: int,
+        accepts_marketing: bool = True,
+    ) -> bool:
+        """Update customer's email marketing consent.
+
+        Args:
+            customer_id: Shopify customer ID
+            accepts_marketing: Whether customer accepts marketing emails
+
+        Returns:
+            True if successful
+
+        Raises:
+            ShopifyAPIError: On API errors
+        """
+        # Use the email_marketing_consent object (newer API)
+        customer_data = {
+            "customer": {
+                "id": customer_id,
+                "email_marketing_consent": {
+                    "state": "subscribed" if accepts_marketing else "not_subscribed",
+                    "opt_in_level": "single_opt_in",
+                }
+            }
+        }
+
+        try:
+            await self._request(
+                "PUT",
+                f"/customers/{customer_id}.json",
+                json_data=customer_data,
+            )
+            logger.debug(f"Updated email marketing for customer {customer_id}: {accepts_marketing}")
+            return True
+        except ShopifyAPIError as e:
+            logger.error(f"Failed to update email marketing for customer {customer_id}: {e}")
+            raise
+
     # =========================================================================
     # PRODUCTS
     # =========================================================================
